@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from transformers import BertTokenizer, BertModel
 
-
+'''
 def entity_conv(h_state, t_state, cls_state, pooling):
     h_state_mean = h_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
     t_state_mean = t_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
@@ -12,6 +12,7 @@ def entity_conv(h_state, t_state, cls_state, pooling):
     t_state_conv = pooling(F.conv1d(cls_state, t_state_mean)).squeeze(-1)
     state = torch.cat((h_state_conv, t_state_conv), -1)
     return state
+'''
 
 
 class BERTSentenceEncoder(nn.Module):
@@ -38,8 +39,9 @@ class BERTSentenceEncoder(nn.Module):
             t_state = outputs[0][tensor_range, inputs["pos2"]]
             h_state_mean = h_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
             t_state_mean = t_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
-            h_state_mean = h_state_mean.repeat(1, 1, self.num_kernels)
-            t_state_mean = t_state_mean.repeat(1, 1, self.num_kernels)
+            kernel_size = (h_state_mean.shape[0], h_state_mean.shape[1], self.num_kernels)
+            h_state_mean = h_state_mean.repeat(*kernel_size)
+            t_state_mean = t_state_mean.repeat(*kernel_size)
             h_state_conv = self.pool(F.conv1d(cls_state, h_state_mean)).squeeze(-1)
             t_state_conv = self.pool(F.conv1d(cls_state, t_state_mean)).squeeze(-1)
             state = torch.cat((h_state_conv, t_state_conv), -1)
