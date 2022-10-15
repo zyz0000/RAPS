@@ -8,7 +8,7 @@ K=1
 
 python train_demo.py \
     --trainN $N --N $N --K $K --Q 1 --dot \
-    --hidden_size 768 --val_step 1000 --test $N-$K-test-relid \
+    --hidden_size 768 --val_step 1000 --test val_wiki \
     --batch_size 4 --only_test \
     --load_ckpt ./checkpoint/camery-ready-$N-$K.pth.tar \
     --pretrain_ckpt /data/zyz/practice/RE/HCRP/bert-base-uncased \
