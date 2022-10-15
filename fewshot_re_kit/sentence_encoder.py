@@ -1,102 +1,112 @@
+import os
+import math
+from collections import OrderedDict
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
+from torch import optim
 from transformers import BertTokenizer, BertModel
-
-'''
-def entity_conv(h_state, t_state, cls_state, pooling):
-    h_state_mean = h_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
-    t_state_mean = t_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
-    h_state_conv = pooling(F.conv1d(cls_state, h_state_mean)).squeeze(-1)
-    t_state_conv = pooling(F.conv1d(cls_state, t_state_mean)).squeeze(-1)
-    state = torch.cat((h_state_conv, t_state_conv), -1)
-    return state
-'''
 
 
 class BERTSentenceEncoder(nn.Module):
 
-    def __init__(self, pretrain_path, max_length, num_kernels, path):
+    def __init__(self, pretrain_path, max_length, cat_entity_rep=False, mask_entity=False, backend_model=None): 
         nn.Module.__init__(self)
         self.bert = BertModel.from_pretrained(pretrain_path)
-        if path is not None and path != "None":
-            self.bert.load_state_dict(torch.load(path)["bert-base"])
-            print("We load " + path + " to train!")
+        
+        if backend_model == 'cp':
+            ckpt = torch.load("./CP_model/CP")
+            temp = OrderedDict()
+            ori_dict = self.bert.state_dict()
+            for name, parameter in ckpt["bert-base"].items():
+                if name in ori_dict:
+                    temp[name] = parameter
+            
+            ori_dict.update(temp)
+            self.bert.load_state_dict(ori_dict)
+        
         self.max_length = max_length
-        self.max_length_name = 8
-        emb_dim = self.bert.pooler.dense.out_features
-        self.num_kernels = num_kernels
         self.tokenizer = BertTokenizer.from_pretrained(pretrain_path)
-        self.pool = nn.AvgPool1d(emb_dim - num_kernels + 1)
-
+        self.cat_entity_rep = cat_entity_rep
+        self.mask_entity = mask_entity
+    
     def forward(self, inputs, cat=True):
-        outputs = self.bert(inputs['word'], attention_mask=inputs['mask'])
-        if cat:
-            tensor_range = torch.arange(inputs['word'].size()[0])
-            cls_state = outputs[0][tensor_range, torch.zeros_like(inputs["pos1"])].unsqueeze(1)
-            h_state = outputs[0][tensor_range, inputs["pos1"]]
-            t_state = outputs[0][tensor_range, inputs["pos2"]]
-            h_state_mean = h_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
-            t_state_mean = t_state.mean(dim=0).unsqueeze(0).transpose(0, 1).unsqueeze(-1)
-            kernel_size = (1, 1, self.num_kernels)
-            h_state_mean = h_state_mean.repeat(*kernel_size)
-            t_state_mean = t_state_mean.repeat(*kernel_size)
-            h_state_conv = self.pool(F.conv1d(cls_state, h_state_mean)).squeeze(-1)
-            t_state_conv = self.pool(F.conv1d(cls_state, t_state_mean)).squeeze(-1)
-            state = torch.cat((h_state_conv, t_state_conv), -1)
-            return state, outputs[0]
+        if not self.cat_entity_rep:
+            x = self.bert(inputs['word'], attention_mask=inputs['mask'])['pooler_output']
+            return x
         else:
-            return outputs[1], outputs[0]
-
+            outputs = self.bert(inputs['word'], attention_mask=inputs['mask'])
+            if cat:
+                sequence_outputs = outputs['last_hidden_state'] # [20, 128, 768]
+                tensor_range = torch.arange(inputs['word'].size()[0])  # inputs['word'].shape  [20, 128]
+                h_state = outputs['last_hidden_state'][tensor_range, inputs["pos1"]] # h_state.shape [20, 768]
+                t_state = outputs['last_hidden_state'][tensor_range, inputs["pos2"]] # [20, 768]
+                batch_size, max_len, feat_dim = sequence_outputs.shape
+                return h_state, t_state, outputs['last_hidden_state']
+            else:
+                return outputs['pooler_output'], outputs['last_hidden_state']
+    
     def tokenize(self, raw_tokens, pos_head, pos_tail):
         # token -> index
         tokens = ['[CLS]']
         cur_pos = 0
-        pos1_in_index = 0
-        pos2_in_index = 0
+        pos1_in_index = 1
+        pos1_end_index = 1
+        
+        pos2_in_index = 1
+        pos2_end_index = 1
+        
         for token in raw_tokens:
             token = token.lower()
-            if cur_pos == pos_head[0]:
+            if cur_pos == pos_head[0]: #if current position is the head position of the entity, insert '[unused0]'.
                 tokens.append('[unused0]')
                 pos1_in_index = len(tokens)
             if cur_pos == pos_tail[0]:
                 tokens.append('[unused1]')
                 pos2_in_index = len(tokens)
-            tokens += self.tokenizer.tokenize(token)
+            if self.mask_entity and ((pos_head[0] <= cur_pos and cur_pos <= pos_head[-1]) or (pos_tail[0] <= cur_pos and cur_pos <= pos_tail[-1])):
+                tokens += ['[unused4]']
+            else:
+                tokens += self.tokenizer.tokenize(token)
             if cur_pos == pos_head[-1]:
                 tokens.append('[unused2]')
+                pos1_end_index = len(tokens)
+                
             if cur_pos == pos_tail[-1]:
                 tokens.append('[unused3]')
+                pos2_end_index = len(tokens)
+                
             cur_pos += 1
-
+            ## the operation above does like: insert '[unused0]','[unused2]' before and after the head entity; insert '[unused1]', '[unused3]' before and after the tail entity
         indexed_tokens = self.tokenizer.convert_tokens_to_ids(tokens)
         
         # padding
         while len(indexed_tokens) < self.max_length:
             indexed_tokens.append(0)
         indexed_tokens = indexed_tokens[:self.max_length]
-    
+        
         # pos
-        pos1 = np.zeros(self.max_length, dtype=np.int32)
-        pos2 = np.zeros(self.max_length, dtype=np.int32)
+        pos1 = np.zeros((self.max_length), dtype=np.int32)
+        pos2 = np.zeros((self.max_length), dtype=np.int32)
         for i in range(self.max_length):
             pos1[i] = i - pos1_in_index + self.max_length
             pos2[i] = i - pos2_in_index + self.max_length
-    
+
         # mask
-        mask = np.zeros(self.max_length, dtype=np.int32)
+        mask = np.zeros((self.max_length), dtype=np.int32)
         mask[:len(tokens)] = 1
-        
-        if pos1_in_index == 0:
-            pos1_in_index = 1
-        if pos2_in_index == 0:
-            pos2_in_index = 1
+
         pos1_in_index = min(self.max_length, pos1_in_index)
         pos2_in_index = min(self.max_length, pos2_in_index)
-    
-        return indexed_tokens, pos1_in_index - 1, pos2_in_index - 1, mask
+        
+        pos1_end_index = min(self.max_length, pos1_end_index)
+        pos2_end_index = min(self.max_length, pos2_end_index)
 
+        return indexed_tokens, pos1_in_index - 1, pos2_in_index - 1, mask, len(indexed_tokens), pos1_end_index - 1, pos2_end_index - 1 #these positions are exactly the position of four special charaters
+        
+    ##TODO tokenize relation name and description
     def tokenize_rel(self, raw_tokens):
         # token -> index
         tokens = ['[CLS]']
@@ -139,4 +149,22 @@ class BERTSentenceEncoder(nn.Module):
         mask = np.zeros(self.max_length_name, dtype=np.int32)
         mask[:len(tokens)] = 1
 
-        return indexed_tokens, mask
+        return indexed_tokens, mask    
+        
+
+class BERTRelationEncoder(nn.Module):
+
+    def __init__(self, pretrain_path, max_length, cat_entity_rep=False, mask_entity=False): 
+        nn.Module.__init__(self)
+        self.bert = BertModel.from_pretrained(pretrain_path)
+        self.max_length = max_length
+        self.tokenizer = BertTokenizer.from_pretrained(pretrain_path)
+    
+    def forward(self, inputs):
+        outputs = self.bert(inputs['word'], attention_mask=inputs['mask'])   
+        final1 = outputs['pooler_output']
+        final2 = outputs['last_hidden_state']
+        
+        return final1, final2
+             
+
