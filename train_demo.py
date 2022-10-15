@@ -19,14 +19,14 @@ from fewshot_re_kit.sentence_encoder import BERTSentenceEncoder, BERTRelationEnc
 
 def setup_seed(seed):
     torch.manual_seed(seed)
-	  if torch.cuda.is_available():
-		  torch.cuda.manual_seed(seed)
-		  torch.cuda.manual_seed_all(seed)
-	  random.seed(seed)
-	  np.random.seed(seed)
-	  torch.backends.cudnn.deterministic = True
-	  torch.backends.cudnn.benchmard = False
-	  torch.random.manual_seed(seed)
+    if torch.cuda.is_available():
+	torch.cuda.manual_seed(seed)
+	torch.cuda.manual_seed_all(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmard = False
+    torch.random.manual_seed(seed)
 
 
 def main():
