@@ -11,7 +11,7 @@ CUDA_VISIBLE_DEVICES="1" python train_demo.py \
     --hidden_size 768 --val_step 1000 --test $N-$K-test-relid \
     --batch_size 4 --test_online \
     --load_ckpt ./checkpoint/acl-camera-ready-$N-$K.pth.tar \
-    --pretrain_ckpt /data/zyz/practice/RE/HCRP/bert-base-uncased \
+    --pretrain_ckpt ./bert-base-uncased \
     --test_output ./submit/pred-$N-$K.json \
     --cat_entity_rep \
     --backend_model bert
