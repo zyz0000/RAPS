@@ -11,7 +11,7 @@ python train_demo.py \
     --hidden_size 768 --val_step 1000 --test val_wiki \
     --batch_size 4 --only_test \
     --load_ckpt ./checkpoint/camery-ready-$N-$K.pth.tar \
-    --pretrain_ckpt /data/zyz/practice/RE/HCRP/bert-base-uncased \
+    --pretrain_ckpt ./bert-base-uncased \
     --cat_entity_rep \
     --test_iter 1000 \
     --backend_model bert
