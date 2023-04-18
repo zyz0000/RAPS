@@ -22,14 +22,32 @@ Please download data from the official links and put it under ``./data/``.
 **FewRel 1.0**
 If you want to train a 5-way 1-shot model on FewRel 1.0, run
 ```bash
-bash scripts/run_train_5_1.sh
+cd scripts
+bash run_train_5_1.sh
 ```
-In ``scripts/run_train_5_1.sh``, you can specify BERT as backend model by ``export BACKEND="bert"``, or CP as backend model by ``export BACKEND="cp"``.
+In ``run_train_5_1.sh``, you can specify BERT as backend model by ``export BACKEND="bert"``, or CP as backend model by ``export BACKEND="cp"``.
 
 **FewRel 2.0**
 If you want to train a 5-way 1-shot model on FewRel 2.0, run
 ```bash
-bash scripts/run_train_5_1_da.sh
+cd scripts
+bash run_train_5_1_da.sh
 ```
-In ``scripts/run_train_5_1_da.sh``, you can specify BERT as backend model by ``export BACKEND="bert"``, or CP as backend model by ``export BACKEND="cp"``.
+In ``run_train_5_1_da.sh``, you can specify BERT as backend model by ``export BACKEND="bert"``, or CP as backend model by ``export BACKEND="cp"``.
 
+## Evaluation
+**FewRel 1.0**
+If you want to evaluate a 5-way 1-shot model on FewRel 1.0, run
+```bash
+cd scripts
+bash run_eval_5_1.sh
+```
+In ``run_eval_5_1.sh``, you can specify BERT as backend model by ``export BACKEND="bert"``, or CP as backend model by ``export BACKEND="cp"``.
+
+**FewRel 2.0**
+If you want to evaluate a 5-way 1-shot model on FewRel 2.0, run
+```bash
+cd scripts
+bash run_eval_5_1_da.sh
+```
+In ``run_eval_5_1_da.sh``, you can specify BERT as backend model by ``export BACKEND="bert"``, or CP as backend model by ``export BACKEND="cp"``.
