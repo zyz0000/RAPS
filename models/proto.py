@@ -61,8 +61,6 @@ class Proto(fewshot_re_kit.framework.FewShotREModel):
         
         rel_rep = rel_rep.view(-1, N, rel_gol.shape[1]*2)
         support = self.alpha1 * support + self.alpha2 * rel_rep
-        rel_gate = torch.sigmoid(self.gate2(torch.cat((rel_rep, support), -1)))
-        support = torch.sigmoid(self.gate1(torch.cat((rel_gate * rel_rep, support), -1))) * support + rel_rep * (1 - rel_gate)
         
         logits = self.__batch_dist__(support, query) # (B, total_Q, N)
         minn, _ = logits.min(-1)
